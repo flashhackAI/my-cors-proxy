@@ -1,11 +1,5 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/proxy.js",
-      "use": "@vercel/node"  // 去掉 @18/@20，只保留核心名称
-    }
-  ],
   "routes": [
     {
       "src": "/(.*)",
