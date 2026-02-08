@@ -3,7 +3,7 @@
   "builds": [
     {
       "src": "api/proxy.js",
-      "use": "@vercel/node@18"
+      "use": "@vercel/node"  // 去掉 @18/@20，只保留核心名称
     }
   ],
   "routes": [
