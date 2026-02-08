@@ -3,7 +3,7 @@
   "builds": [
     {
       "src": "api/proxy.js",
-      "use": "@vercel/node@20.x"
+      "use": "@vercel/node@18"
     }
   ],
   "routes": [
