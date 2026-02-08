@@ -1,43 +1,48 @@
-import fetch from 'node-fetch';
-
 export default async function handler(req, res) {
-  // 1. 设置 CORS 响应头（允许所有域名，生产环境可指定具体域名）
+  // 1. 配置 CORS 头
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   // 2. 处理 OPTIONS 预检请求
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
+  }
+
+  // 3. 仅支持 GET 请求（先简化逻辑，避免复杂请求的问题）
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: '仅支持 GET 请求' });
   }
 
   try {
-    // 3. 获取目标请求地址（从 URL 路径中解析）
-    const targetUrl = decodeURIComponent(req.url.slice(1)); // 去掉开头的 /
-    if (!targetUrl) {
-      return res.status(400).json({ error: '请传入目标 URL，例如：https://你的代理域名/https://api.example.com' });
+    // 4. 解析目标 URL（严格校验格式）
+    const targetUrl = decodeURIComponent(req.url.slice(1));
+    if (!targetUrl.startsWith('http')) {
+      return res.status(400).json({ error: '目标 URL 必须以 http/https 开头' });
     }
 
-    // 4. 转发请求到目标地址
+    // 5. 转发请求（去掉自定义请求头，避免格式错误）
     const response = await fetch(targetUrl, {
-      method: req.method,
-      headers: req.headers,
-      body: req.method !== 'GET' ? req.body : undefined,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
 
-    // 5. 转发响应到前端
-    const data = await response.text();
+    // 6. 转发响应
+    const data = await response.json().catch(() => response.text());
     res.status(response.status).send(data);
   } catch (error) {
-    res.status(500).json({ error: '代理请求失败', message: error.message });
+    // 捕获并返回错误信息（方便排查）
+    res.status(500).json({ 
+      error: '代理失败', 
+      detail: error.message 
+    });
   }
 }
 
-// 解决 node-fetch 依赖问题（Vercel 环境需要）
 export const config = {
   api: {
-    bodyParser: true,
-    externalResolver: true,
-  },
+    bodyParser: true
+  }
 };
