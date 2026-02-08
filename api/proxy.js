@@ -1,48 +1,43 @@
-export default async function handler(req, res) {
-  // 1. 配置 CORS 头
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+module.exports = async (req, res) => {
+  const { url, ...queryParams } = req.query
 
-  // 2. 处理 OPTIONS 预检请求
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // 3. 仅支持 GET 请求（先简化逻辑，避免复杂请求的问题）
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: '仅支持 GET 请求' });
+  if (!url) {
+    return res.status(400).send('Missing url parameter')
   }
 
   try {
-    // 4. 解析目标 URL（严格校验格式）
-    const targetUrl = decodeURIComponent(req.url.slice(1));
-    if (!targetUrl.startsWith('http')) {
-      return res.status(400).json({ error: '目标 URL 必须以 http/https 开头' });
+    const targetUrl = new URL(url)
+    // 将其他查询参数添加到目标URL
+    Object.keys(queryParams).forEach(key => targetUrl.searchParams.append(key, queryParams[key]))
+
+    const response = await fetch(targetUrl.toString(), {
+      method: req.method,
+      headers: {
+        ...req.headers,
+        host: targetUrl.host
+      },
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined
+    })
+
+    // 设置CORS头
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', '*')
+
+    // 如果是预检请求，直接返回
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end()
     }
 
-    // 5. 转发请求（去掉自定义请求头，避免格式错误）
-    const response = await fetch(targetUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
+    // 将目标响应头复制到响应中
+    response.headers.forEach((value, key) => {
+      if (key !== 'content-encoding') { // 避免压缩问题
+        res.setHeader(key, value)
       }
-    });
+    })
 
-    // 6. 转发响应
-    const data = await response.json().catch(() => response.text());
-    res.status(response.status).send(data);
+    response.body.pipe(res)
   } catch (error) {
-    // 捕获并返回错误信息（方便排查）
-    res.status(500).json({ 
-      error: '代理失败', 
-      detail: error.message 
-    });
+    res.status(500).send(error.message)
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: true
-  }
-};
